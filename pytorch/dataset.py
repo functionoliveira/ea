@@ -1,0 +1,25 @@
+import torch
+from torch.utils.data import DataLoader
+from torchvision.datasets import MNIST
+import torchvision.transforms as transforms
+from torch.utils.data.dataloader import default_collate
+
+transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])
+transform2 = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))])
+resize = transforms.Compose([transforms.Resize((32, 32)),
+                                 transforms.ToTensor()])
+
+def getTrainLoader(device):
+    if device != None:
+        return DataLoader(MNIST('./files/', train=True, transform=resize, download=True), batch_size=64, shuffle=True, collate_fn=lambda x: tuple(x_.to(device) for x_ in default_collate(x)))
+    else:
+        return DataLoader(MNIST('./files/', train=True, transform=resize, download=True), batch_size=64, shuffle=True, collate_fn=lambda x: tuple(x_.to(device) for x_ in default_collate(x)))
+    
+def getValidationLoader(device):
+    if device != None:
+        return DataLoader(MNIST('./files/', train=False, transform=resize, download=True), batch_size=64, shuffle=True, collate_fn=lambda x: tuple(x_.to(device) for x_ in default_collate(x)))
+    else:
+        return DataLoader(MNIST('./files/', train=False, transform=resize, download=True), batch_size=64, shuffle=True)
+    
+dummy_data_x = torch.randn(100, 10)
+dummy_data_y = (torch.rand(size=(100, 1)) < 0.5).float()

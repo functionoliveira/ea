@@ -1,0 +1,12 @@
+version: "3.9"
+
+services:
+    python:
+        build:
+            context: ./
+            dockerfile: dockerfile
+        environment:
+            - CUDA_VISIBLE_DEVICES=0,2
+        ipc: "host"
+        volumes:
+            - ./:/home/project_ring_society
