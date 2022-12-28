@@ -102,7 +102,8 @@ class PoolLast:
         """
 
         if np.all([value == 0 for value in self.improvements.values()]):
-            import ipdb; ipdb.set_trace()
+            import ipdb 
+            ipdb.set_trace()
             new_method = np.random.choice(self.improvements.keys())
             print("new_method: {}".format(new_method))
             return new_method
@@ -334,7 +335,7 @@ def shadeils(fitness_fun, funinfo, dim, evals, fid, info_de, popsize=100, debug=
     num_restarts = 0
 
     while totalevals < maxevals:
-        method = ""
+        method = None
 
         if not pool_global.is_empty():
             previous_fitness = current_best.fitness

@@ -1,0 +1,6 @@
+/report/**
+/shade_output/**
+/up_shadeils_output/**
+/shadeils_output/**
+/__pycache__/**
+settings.json

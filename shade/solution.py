@@ -114,15 +114,39 @@ class NeuralNetSolution(Solution):
                     size = data.size()
                     w = torch.empty(size)
                     nn.init.xavier_uniform_(w, gain=nn.init.calculate_gain('relu'))
-                    ind[idx] = w.numpy()
+                    ind[idx] = w.numpy().astype(dtype=np.double)
                 if idx % 2 == 1:
                     size = data.size()
                     b = torch.empty(size)
                     torch.nn.init.zeros_(b)
-                    ind[idx] = b.numpy()
+                    ind[idx] = b.numpy().astype(dtype=np.double)
             population.append(ind)
         
         return population
+    
+    def to_1d_array(self, x):
+        arr = []
+        
+        for i in x.values():
+            for j in i.flatten():
+                arr.append(j)
+    
+        return np.array(arr)
+    
+    def to_solution(self, oned_array):
+        layers = OrderedDict()
+        i = 0
+        size = 0
+        for idx, data in enumerate(self.model.parameters()):
+            shape = list(data.size())
+            size += np.prod(shape)
+            arr = []
+            while i < size:
+                arr.append(oned_array[i])
+                i += 1
+            layers[idx] = np.reshape(np.array(arr, dtype=np.double), shape)
+    
+        return layers
     
     def fitness(self, x):
         assert isinstance(x, OrderedDict)
@@ -130,12 +154,22 @@ class NeuralNetSolution(Solution):
         clone = cp.deepcopy(self.model)
         pytorch_model_set_weights(clone, x)
         clone.to(self.device)
-        predicted = clone(self.input)
+        predicted = clone(self.input.double())
         loss = self.fn_loss(predicted, self.output)
         return loss.item()
     
     def fitness_all(self, population):
         return [self.fitness(ind) for ind in population]
+    
+    def ls_fitness(self, x):
+        assert isinstance(x, np.ndarray)
+        
+        clone = cp.deepcopy(self.model)
+        pytorch_model_set_weights(clone, self.to_solution(x))
+        clone.to(self.device)
+        predicted = clone(self.input.double())
+        loss = self.fn_loss(predicted, self.output)
+        return loss.item()
 
 class SingleLayerSolution(Solution):
     def __init__(self, model, fn_loss, input, output, device=None, target=None):
@@ -167,17 +201,17 @@ class SingleLayerSolution(Solution):
             ind = OrderedDict()
             for idx, data in enumerate(self.model.parameters()):
                 if idx != self.target:
-                    ind[idx] = data.cpu().detach().numpy()
+                    ind[idx] = data.cpu().detach().numpy().astype(dtype=np.double)
                 if idx % 2 == 0 and idx == self.target:
                     size = data.size()
                     w = torch.empty(size)
                     nn.init.xavier_uniform_(w, gain=nn.init.calculate_gain('relu'))
-                    ind[idx] = w.numpy()
+                    ind[idx] = w.numpy().astype(dtype=np.double)
                 if idx % 2 == 1 and idx == self.target:
                     size = data.size()
                     b = torch.empty(size)
-                    torch.nn.init.zeros_(b)
-                    ind[idx] = b.numpy()
+                    torch.nn.init.trunc_normal_(b, mean=-0.5, std=0.5, a=-1, b=0)
+                    ind[idx] = b.numpy().astype(dtype=np.double)
             population.append(ind)
             
         if (self.current_best is not None):
@@ -186,6 +220,30 @@ class SingleLayerSolution(Solution):
             
         return population
     
+    def to_1d_array(self, x):
+        arr = []
+        
+        for i in x.values():
+            for j in i.flatten():
+                arr.append(j)
+    
+        return np.array(arr)
+    
+    def to_solution(self, oned_array):
+        layers = OrderedDict()
+        i = 0
+        size = 0
+        for idx, data in enumerate(self.model.parameters()):
+            shape = list(data.size())
+            size += np.prod(shape)
+            arr = []
+            while i < size:
+                arr.append(oned_array[i])
+                i += 1
+            layers[idx] = np.reshape(np.array(arr, dtype=np.double), shape)
+    
+        return layers
+    
     def fitness(self, x):
         if self.target is None:
             raise ValueError("Attribute 'target' cannot be None.")
@@ -193,9 +251,19 @@ class SingleLayerSolution(Solution):
 
         pytorch_model_set_weights(self.model, x)
         self.model.to(self.device)
-        predicted = self.model(self.input)
+        predicted = self.model(self.input.double())
         loss = self.fn_loss(predicted, self.output)
         return loss.item()
     
     def fitness_all(self, population):
         return [self.fitness(ind) for ind in population]
+    
+    def ls_fitness(self, x):
+        assert isinstance(x, np.ndarray)
+        
+        clone = cp.deepcopy(self.model)
+        pytorch_model_set_weights(clone, self.to_solution(x))
+        clone.to(self.device)
+        predicted = clone(self.input.double())
+        loss = self.fn_loss(predicted, self.output)
+        return loss.item()
