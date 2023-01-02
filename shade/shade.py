@@ -35,14 +35,13 @@ class Shade(EA):
         self.solution = solution
         self.popsize = popsize
         self.H = popsize
-        self.G = range(1, generations)
+        self.G = range(1, generations+1)
         self.threshold = threshold
         self.mutation_method = CurrentToPBestOneBin()
         self.crossover = SADECrossover(2)
         self.debug = debug
         self.root_folder = 'shade_output'
         self.compound_folder = []
-        self.debug_folder = 'shade_output'
         self.log = log('./shade_output')
 
     def updateMemory(self, Sf, SCr, improvements):
@@ -93,8 +92,11 @@ class Shade(EA):
             self.population = self.solution.initialize_population(self.popsize)
         if len(self.population_fitness) == 0:
             self.population_fitness = self.solution.fitness_all(self.population)
-        MemF = np.ones(self.H)*0.5
-        MemCr = np.ones(self.H)*0.5
+        
+        if not hasattr(self, 'MemF'):
+            self.MemF = np.ones(self.H)*0.5
+        if not hasattr(self, 'MemCr'):
+            self.MemCr = np.ones(self.H)*0.5
         # Optional external archive, it used to maintain diversity. SHADE strategy inherits from JADE.
         A = []
         # Index counter
@@ -111,9 +113,9 @@ class Shade(EA):
                 # random selection
                 r = np.random.randint(1, self.H)
                 # random normal distribution with mean = MemCr and variance = 0.1
-                Cr = np.random.randn() * 0.1 + MemCr[r]
+                Cr = np.random.randn() * 0.1 + self.MemCr[r]
                 # random cauchy distribution with mean = MemFr and variance = 0.1
-                F = np.random.standard_cauchy() * 0.1 + MemF[r]
+                F = np.random.standard_cauchy() * 0.1 + self.MemF[r]
                 # pi = rand[pmin, 0.2] 
                 p = np.random.rand() * (0.2-pmin) + pmin
                 # Get one random value from population
@@ -136,16 +138,20 @@ class Shade(EA):
                 self.log.info(f"algorithm={self.__class__.__name__} generation={g} Cr={Cr} F={F} pi={p} r1={r1} r2={r2} maxbest={maxbest} fitness_trial={fitness_t} fitness_ind={fitness_i}")
                 
                 # Creating offspring based on fitness function
-                options = [ind, trial]
-                fitness = [fitness_i, fitness_t]
-                offspring.append(options[np.argmin(fitness)])
+                # options = [ind, trial]
+                # fitness = [fitness_i, fitness_t]
+                # offspring.append(options[np.argmin(fitness)])
+                    
                 
                 # Archiving individuals from old generation
                 if fitness_t < fitness_i:
+                    offspring.append(trial)
                     A.append(ind)
                     Scr.append(Cr)
                     Sf.append(F)
                     weights.append(fitness_i - fitness_t)
+                else:
+                    offspring.append(ind)
             
             self.population = offspring
             self.population_fitness = self.solution.fitness_all(self.population)
@@ -159,11 +165,11 @@ class Shade(EA):
             
             if len(Scr) > 0 and len(Sf) > 0:
                 new_F, new_Cr = self.updateMemory(Sf, Scr, weights)
-                MemCr[k] = new_Cr
-                MemF[k] = new_F
+                self.MemCr[k] = new_Cr
+                self.MemF[k] = new_F
                 k = 1 if k >= self.H - 1 else k + 1
             
-            self.log.info(f"algorithm={self.__class__.__name__} generation={g} Archive={len(A)} Scr={len(Scr)} Sf={len(Sf)} avg_weights={np.average(weights)} avg_fitness={np.average(self.population_fitness)} best_fitness={np.min(self.population_fitness)} worst_fitness={np.max(self.population_fitness)}")
+            self.log.info(f"algorithm={self.__class__.__name__} generation={g} Archive={len(A)} Scr={len(Scr)} Sf={len(Sf)} avg_weights={np.average(weights)} avg_fitness={np.average(self.population_fitness)} best_fitness={np.min(self.population_fitness)} fitness={self.population_fitness}")
             # Save info about generation in json files
             self.compound_folder.append(f'gen_{g}') 
             self.save_generation()
@@ -242,7 +248,7 @@ class LS_METHOD(Enum):
 class ShadeILS(Shade):
         
     def __init__(self, solution, maxevals=10000, threshold=0.01, generations=10, popsize=100, debug=True, log=Log):
-        super().__init__(solution, threshold, generations, popsize, debug, log)
+        super().__init__(solution, threshold, 10, popsize, debug, log)
         
         self.maxevals = maxevals
         self.current_best = None
@@ -251,8 +257,9 @@ class ShadeILS(Shade):
         self.SR_global_mts = None
         self.ls_method = LS_METHOD.ALL
         self.root_folder = 'shadeils_output'
-        self.debug_folder = 'shadeils_output'
         self.log = log('./shadeils_output')
+        self.num_worse = 0
+        self.num_restarts = 0
 
     def set_current_best(self, solution, fitness):
         if self.current_best is None or self.current_best_fitness > fitness:
@@ -304,16 +311,17 @@ class ShadeILS(Shade):
         self.SR_MTS = np.copy(self.SR_global_mts)
 
     def reset_ls(self):
-        if self.ls_method.is_all() or self.ls_method.is_mts():
-            self.SR_global_mts = np.ones(self.solution.to_1d_array(self.current_best).shape)*0.5
-            self.SR_MTS = self.SR_global_mts
+        self.SR_global_mts = np.ones(self.solution.to_1d_array(self.current_best).shape)*0.5
+        self.SR_MTS = self.SR_global_mts
 
     def evolve(self):
         self.log.info(f"Starting algorithm={self.__class__.__name__} popsize={self.popsize} generations={len(self.G)} max_evals={self.maxevals} threshold={self.threshold} mutation={self.mutation_method.__class__.__name__} crossover={self.crossover.__class__.__name__}")
         self.totalevals = 1
         
-        self.population = self.solution.initialize_population(self.popsize)
-        self.population_fitness = self.solution.fitness_all(self.population)
+        if len(self.population) == 0:
+            self.population = self.solution.initialize_population(self.popsize)
+        if len(self.population_fitness) == 0:    
+            self.population_fitness = self.solution.fitness_all(self.population)
         best_id = np.argmin(self.population_fitness)
 
         initial_sol = self.population[best_id]
@@ -330,10 +338,8 @@ class ShadeILS(Shade):
         pool_global = PoolLast(methods)
         pool = PoolLast(methods)
 
-        evals_gs = min(5*self.popsize, 25000)
-        evals_ls = min(1*self.popsize, 5000)
-        num_worse = 0
-        num_restarts = 0
+        evals_gs = 20
+        evals_ls = 10
         previous_fitness = 0
         g = 0
         
@@ -369,52 +375,55 @@ class ShadeILS(Shade):
                 self.log.info(f"algorithm={self.__class__.__name__} phase='Local Search' previous_fitness={previous_fitness} ls_method={method} improvement={improvement} total_evals={self.totalevals} current_best={self.current_best_fitness} best_global={self.best_global_fitness}")
 
             self.set_best_global(self.current_best, self.current_best_fitness)
-            self.log.info(f"algorithm={self.__class__.__name__} best_global={self.best_global_fitness} total_evals={self.totalevals}")
             
             # Restart if it is not improved
             if (previous_fitness == 0):
                 ratio_improvement = 1
             else:
-                ratio_improvement = (previous_fitness - self.best_fitness)/previous_fitness
+                ratio_improvement = (previous_fitness - self.best_global_fitness) / previous_fitness
 
             if ratio_improvement >= self.threshold:
-                num_worse = 0
+                self.num_worse = 0
             else:
-                num_worse += 1
+                self.num_worse += 1
                 # Random the LS
                 self.reset_ls()
-
+            
+            self.log.info(f"algorithm={self.__class__.__name__} best_global={self.best_global_fitness} total_evals={self.totalevals} ratio_improvement={ratio_improvement} num_worse={self.num_worse}")
+            
             # restart criteria
-            # if num_worse >= 3:
-            #     num_worse = 0
-            #     # Increase a 1% of values
-            #     posi =  np.random.choice(self.popsize)
-            #     surviver = self.population[posi]
+            if self.num_worse >= 5:
+                self.num_worse = 0
+                # Increase a 1% of values
+                posi =  np.random.choice(self.popsize)
+                surviver = self.population[posi]
 
-            #     # Init DE
-            #     self.population = self.solution.initialize_population
-            #     self.population[posi] = surviver
-            #     self.population_fitness = self.solution.fitness_all(self.population)
-            #     self.totalevals += self.popsize
-            #     best_id = np.argmin(self.population_fitness)
+                # Init DE
+                self.population = self.solution.initialize_population(self.popsize)
+                self.population[posi] = surviver
+                self.population_fitness = self.solution.fitness_all(self.population)
+                self.totalevals += self.popsize
+                best_id = np.argmin(self.population_fitness)
 
-            #     initial_sol = self.population[best_id]
-            #     initial_fitness = self.population_fitness[best_id]
+                initial_sol = self.population[best_id]
+                initial_fitness = self.population_fitness[best_id]
+                
+                self.current_best = initial_sol
+                self.current_best_fitness = initial_fitness
+                
+                self.best_global = initial_sol
+                self.best_global_fitness = initial_fitness
 
-            #     self.set_current_best(initial_sol, initial_fitness)
-            #     self.set_best_global(initial_sol, initial_fitness)
-
-            #     # Random the LS
-            #     pool_global.reset()
-            #     pool.reset()
-            #     self.reset_ls()
-            #     num_restarts += 1
-
+                # Random the LS
+                pool_global.reset()
+                pool.reset()
+                self.reset_ls()
+                self.num_restarts += 1
+                self.log.info(f"algorithm={self.__class__.__name__} phase='Restart' restarts={self.num_restarts} best_global={self.best_global_fitness} total_evals={self.totalevals}")
+            
             self.save_generation()
             self.compound_folder.pop()
             g += 1
-            if self.totalevals >= self.maxevals:
-                break
         
 class DownShadeILS(ShadeILS):
     """Success-History Based Parameter Adaptation for Differential Evolution
@@ -445,16 +454,16 @@ class DownShadeILS(ShadeILS):
                 self.compound_folder[1] = f'layer_{l}'
                 self.solution.set_target(l)
                 super().evolve()
-                if (self.solution.current_best is None or self.best_global_fitness < self.solution.current_best_fitness):
-                    self.solution.set_current_best(self.best_global)
-                    self.solution.set_current_best_fitness(self.best_global_fitness)
-                self.log.info(f"algorithm={self.__class__.__name__} epoch={e} layer={l} best_fitness={self.solution.current_best_fitness}")
+                # if (self.solution.current_best is None or self.best_global_fitness < self.solution.current_best_fitness):
+                #     self.solution.set_current_best(self.best_global)
+                #     self.solution.set_current_best_fitness(self.best_global_fitness)
+                self.log.info(f"algorithm={self.__class__.__name__} epoch={e} layer={l} best_fitness={self.best_global_fitness}")
             self.log.info(f"algorithm={self.__class__.__name__} epoch={e} best_fitness={self.best_global_fitness}")
 
 class UpShadeILS(DownShadeILS):
     def __init__(self, solution, epochs=20, maxevals=10000, threshold=0.01, generations=10, popsize=100, debug=True, log=Log):
         raise_if(not isinstance(solution, SingleLayerSolution), messages.SOLUTION_VALUE_ERROR, ValueError)
-        super().__init__(solution, maxevals, epochs, threshold, generations, popsize, debug, log)
+        super().__init__(solution, epochs, maxevals, threshold, generations, popsize, debug, log)
         self.log = log('./up_shadeils_output')
         self.root_folder = 'up_shadeils_output'
     

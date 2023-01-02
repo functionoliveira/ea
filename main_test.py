@@ -118,7 +118,7 @@ def main(args):
     if args.test_type == 2:
         model = CNN().to(device)
         summary(model, (1, 28, 28))
-        input, output = next(iter(getTrainLoader(device)))
+        input, output = next(iter(getTrainLoader(device, 10000)))
         fn_loss = cross_entropy
 
     if not args.optim in [1, 2, 3, 4, 5, 6]:

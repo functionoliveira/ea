@@ -8,14 +8,14 @@ transform2 = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.
 resize = transforms.Compose([transforms.Resize((32, 32)),
                                  transforms.ToTensor()])
 
-def getTrainLoader(device):
+def getTrainLoader(device, batch_size=64):
     if device != None:
-        return DataLoader(MNIST('./files/', train=True, transform=resize, download=True), batch_size=64, shuffle=True, collate_fn=lambda x: tuple(x_.to(device) for x_ in default_collate(x)))
+        return DataLoader(MNIST('./files/', train=True, transform=resize, download=True), batch_size=batch_size, shuffle=True, collate_fn=lambda x: tuple(x_.to(device) for x_ in default_collate(x)))
     else:
-        return DataLoader(MNIST('./files/', train=True, transform=resize, download=True), batch_size=64, shuffle=True, collate_fn=lambda x: tuple(x_.to(device) for x_ in default_collate(x)))
+        return DataLoader(MNIST('./files/', train=True, transform=resize, download=True), batch_size=batch_size, shuffle=True, collate_fn=lambda x: tuple(x_.to(device) for x_ in default_collate(x)))
     
-def getValidationLoader(device):
+def getValidationLoader(device, batch_size):
     if device != None:
-        return DataLoader(MNIST('./files/', train=False, transform=resize, download=True), batch_size=64, shuffle=True, collate_fn=lambda x: tuple(x_.to(device) for x_ in default_collate(x)))
+        return DataLoader(MNIST('./files/', train=False, transform=resize, download=True), batch_size=batch_size, shuffle=True, collate_fn=lambda x: tuple(x_.to(device) for x_ in default_collate(x)))
     else:
-        return DataLoader(MNIST('./files/', train=False, transform=resize, download=True), batch_size=64, shuffle=True)
+        return DataLoader(MNIST('./files/', train=False, transform=resize, download=True), batch_size=batch_size, shuffle=True)

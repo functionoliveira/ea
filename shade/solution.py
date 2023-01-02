@@ -191,7 +191,7 @@ class SingleLayerSolution(Solution):
     def set_current_best_fitness(self, value):
         self.current_best_fitness = value
 
-    def initialize_population(self, popsize):
+    def initialize_population_old(self, popsize):
         if self.target is None:
             raise ValueError("Attribute 'target' cannot be None.")
             
@@ -220,29 +220,70 @@ class SingleLayerSolution(Solution):
             
         return population
     
-    def to_1d_array(self, x):
-        arr = []
+    def initialize_population(self, popsize):
+        population = []
         
-        for i in x.values():
-            for j in i.flatten():
-                arr.append(j)
+        for _ in range(popsize):
+            ind = OrderedDict()
+            for idx, data in enumerate(self.model.parameters()):
+                size = data.size()
+                tensor_empty = torch.empty(size)
+                if idx % 2 == 0:
+                    nn.init.xavier_uniform_(tensor_empty, gain=nn.init.calculate_gain('relu'))
+                    ind[idx] = tensor_empty.numpy().astype(dtype=np.double)
+                if idx % 2 == 1:
+                    torch.nn.init.trunc_normal_(tensor_empty, mean=-0.5, std=0.5, a=-1, b=0)
+                    ind[idx] = tensor_empty.numpy().astype(dtype=np.double)
+            population.append(ind)
+        
+        if (self.current_best is not None):
+            idx = np.random.randint(0, popsize)
+            population[idx] = self.current_best
+        
+        return population
     
-        return np.array(arr)
+    # def to_1d_array(self, x):
+    #     arr = []
+        
+    #     for i in x.values():
+    #         for j in i.flatten():
+    #             arr.append(j)
+    
+    #     return np.array(arr)
+    
+    def to_1d_array(self, x):
+        self.current_best = x
+        
+        for i, v in x.items():
+            if i == self.target:
+                return v.flatten()
+            
+        raise Exception(f"Target {self.target} not found.")
+    
+    # def to_solution(self, oned_array):
+    #     layers = OrderedDict()
+    #     i = 0
+    #     size = 0
+    #     for idx, data in enumerate(self.model.parameters()):
+    #         shape = list(data.size())
+    #         size += np.prod(shape)
+    #         arr = []
+    #         while i < size:
+    #             arr.append(oned_array[i])
+    #             i += 1
+    #         layers[idx] = np.reshape(np.array(arr, dtype=np.double), shape)
+    
+    #     return layers
     
     def to_solution(self, oned_array):
-        layers = OrderedDict()
-        i = 0
-        size = 0
+        assert isinstance(self.current_best, OrderedDict)
+        
         for idx, data in enumerate(self.model.parameters()):
-            shape = list(data.size())
-            size += np.prod(shape)
-            arr = []
-            while i < size:
-                arr.append(oned_array[i])
-                i += 1
-            layers[idx] = np.reshape(np.array(arr, dtype=np.double), shape)
+            if self.target == idx:
+                shape = list(data.size())
+                self.current_best[self.target] = np.reshape(np.array(oned_array, dtype=np.double), shape)
     
-        return layers
+        return self.current_best
     
     def fitness(self, x):
         if self.target is None:
