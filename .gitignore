@@ -1,6 +1,7 @@
 /report/**
 /shade_output/**
-/up_shadeils_output_29_12_2022_18_00/**
+/output/**
+/*_output/**
 /up_shadeils_output/**
 /shadeils_output/**
 /__pycache__/**

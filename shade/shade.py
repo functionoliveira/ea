@@ -432,13 +432,14 @@ class DownShadeILS(ShadeILS):
         EA (Object): Classe base para algoritmos de evolução
     """
     
-    def __init__(self, solution, epochs=20, maxevals=10000, threshold=0.01, generations=10, popsize=100, debug=True, log=Log):
+    def __init__(self, solution, epochs=20, maxevals=10000, threshold=0.01, generations=10, popsize=100, debug=True, log=Log, dataset=None):
         raise_if(not isinstance(solution, SingleLayerSolution), messages.SOLUTION_VALUE_ERROR, ValueError)
         super().__init__(solution, maxevals, threshold, generations, popsize, debug, log)
         self.epochs = epochs
         self.log = log('./down_shadeils_output')
         self.root_folder = 'down_shadeils_output'
         self.compound_folder = ['', '']
+        self.dataset = dataset
 
     def get_layers(self):
         return [idx for idx, _ in enumerate(self.solution.model.parameters())]
@@ -448,22 +449,31 @@ class DownShadeILS(ShadeILS):
         EPOCHS = [e for e in range(self.epochs)]
         layers = self.get_layers()
 
-        for e in EPOCHS:
-            self.compound_folder[0] = f'epoch_{e}'
-            for l in layers:
-                self.compound_folder[1] = f'layer_{l}'
-                self.solution.set_target(l)
-                super().evolve()
-                # if (self.solution.current_best is None or self.best_global_fitness < self.solution.current_best_fitness):
-                #     self.solution.set_current_best(self.best_global)
-                #     self.solution.set_current_best_fitness(self.best_global_fitness)
-                self.log.info(f"algorithm={self.__class__.__name__} epoch={e} layer={l} best_fitness={self.best_global_fitness}")
-            self.log.info(f"algorithm={self.__class__.__name__} epoch={e} best_fitness={self.best_global_fitness}")
+        if self.dataset is None:    
+            for e in EPOCHS:
+                self.compound_folder[0] = f'epoch_{e}'
+                for l in layers:
+                    self.compound_folder[1] = f'layer_{l}'
+                    self.solution.set_target(l)
+                    super().evolve()
+                    self.log.info(f"algorithm={self.__class__.__name__} epoch={e} layer={l} best_fitness={self.best_global_fitness}")
+                self.log.info(f"algorithm={self.__class__.__name__} epoch={e} best_fitness={self.best_global_fitness}")
+        else:
+            for e in EPOCHS:
+                self.compound_folder[0] = f'epoch_{e}'
+                for input, output in self.dataset:
+                    for l in layers:
+                        self.compound_folder[1] = f'layer_{l}'
+                        self.solution.set_data(input, output)
+                        self.solution.set_target(l)
+                        super().evolve()
+                        self.log.info(f"algorithm={self.__class__.__name__} epoch={e} layer={l} best_fitness={self.best_global_fitness}")
+                self.log.info(f"algorithm={self.__class__.__name__} epoch={e} best_fitness={self.best_global_fitness}")
 
 class UpShadeILS(DownShadeILS):
-    def __init__(self, solution, epochs=20, maxevals=10000, threshold=0.01, generations=10, popsize=100, debug=True, log=Log):
+    def __init__(self, solution, epochs=20, maxevals=10000, threshold=0.01, generations=10, popsize=100, debug=True, log=Log, dataset=None):
         raise_if(not isinstance(solution, SingleLayerSolution), messages.SOLUTION_VALUE_ERROR, ValueError)
-        super().__init__(solution, epochs, maxevals, threshold, generations, popsize, debug, log)
+        super().__init__(solution, epochs, maxevals, threshold, generations, popsize, debug, log, dataset)
         self.log = log('./up_shadeils_output')
         self.root_folder = 'up_shadeils_output'
     

@@ -182,6 +182,10 @@ class SingleLayerSolution(Solution):
         self.current_best_fitness = None
         self.device = device
 
+    def set_data(self, input, output):
+        self.input = input
+        self.output = output
+
     def set_target(self, value):
         self.target = value
         
@@ -281,6 +285,7 @@ class SingleLayerSolution(Solution):
         for idx, data in enumerate(self.model.parameters()):
             if self.target == idx:
                 shape = list(data.size())
+                oned_array = np.clip(oned_array, -500, 500)
                 self.current_best[self.target] = np.reshape(np.array(oned_array, dtype=np.double), shape)
     
         return self.current_best
