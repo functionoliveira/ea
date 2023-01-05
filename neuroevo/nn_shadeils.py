@@ -44,7 +44,6 @@ class DownShadeILS(ShadeILS):
                     super().evolve()
                     self.log.info(f"algorithm={self.__class__.__name__} epoch={e} batch={batch} layer={l} best_fitness={self.best_global_fitness}")
                 input, output = self.dataset[:]
-                self.solution.set_current_id(self.best_global_id)
                 loss = self.solution.fitness(self.best_global)
                 self.log.info(f"algorithm={self.__class__.__name__} epoch={e} batch={batch} loss={loss}")
             self.log.info(f"algorithm={self.__class__.__name__} epoch={e} best_fitness={self.best_global_fitness}")

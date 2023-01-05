@@ -26,7 +26,7 @@ class LS_METHOD(Enum):
         return self == self.GRAD
 
 class ShadeILS(Shade):
-    def __init__(self, solution, maxevals=10000, threshold=0.01, generations=10, popsize=100, debug=True, log=Log, identity=''):
+    def __init__(self, solution, maxevals=10000, threshold=0.01, generations=50, popsize=100, debug=True, log=Log, identity=''):
         super().__init__(solution, threshold, generations, popsize, debug, log)
         
         self.maxevals = maxevals
@@ -121,8 +121,8 @@ class ShadeILS(Shade):
         pool_global = PoolLast(methods)
         pool = PoolLast(methods)
 
-        evals_gs = 20
-        evals_ls = 10
+        evals_gs = 200
+        evals_ls = 100
         previous_fitness = 0
         g = 0
         
@@ -144,8 +144,9 @@ class ShadeILS(Shade):
 
             if apply_de:
                 self.compound_folder.append(f'turn_{g}')
+                previous_fitness = self.get_current_best_fitness()
                 super().evolve()
-                improvement = self.get_current_best_fitness() - self.best_fitness
+                improvement = previous_fitness - self.best_fitness
                 self.totalevals += len(self.G)
                 self.set_current_best(self.best_id, self.best, self.best_fitness)
                 self.log.info(f"algorithm={self.__class__.__name__} phase='DE' improvement={improvement} total_evals={self.totalevals} current_best={self.current_best_fitness} best_global={self.best_global_fitness}")
